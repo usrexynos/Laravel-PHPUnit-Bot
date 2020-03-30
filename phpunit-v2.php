@@ -99,7 +99,7 @@ Laravel PHPUnit V.2 Upgraded \n";
                     if(!in_array($url, $hasScanned)) {
                         $hasScanned[] = $url;
                         
-                        $getVersion = $this->dataScrap(dirname($url), true, null, null, false, true);
+                        $getVersion = $this->dataScrap(dirname($url), true, null, null, true, true);
                         $versionToJson = json_decode($getVersion);
                         $versionCheck = str_replace(['~','^','.','*','>','<','='],'' , $versionToJson['require-dev']['phpunit/phpunit']);
                         if(isset($versionCheck) && !empty($versionCheck)) {
